@@ -1,0 +1,8 @@
+project-cg/build/
+*.bin
+*.g3a
+project-win32/Debug
+project-win32/Release
+project-win32/SDL
+project-win32/.vs
+*.dll
