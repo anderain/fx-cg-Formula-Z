@@ -50,8 +50,8 @@
 #       define KEY_CHAR_MINUS       269
 #       define KEY_CHAR_MULT        268
 #       define KEY_CHAR_DIV         267
-#       define KEY_CHAR_LBRCKT      290 /* F9 */
-#       define KEY_CHAR_RBRCKT      291 /* F10 */
+#       define KEY_CHAR_LPAR        290 /* F9 */
+#       define KEY_CHAR_RPAR        291 /* F10 */
 #       define KEY_CHAR_COMMA       ','
 #       define KEY_CHAR_DP          '.'
 #       define KEY_CTRL_EXE         0xd

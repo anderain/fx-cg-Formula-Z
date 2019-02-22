@@ -1012,8 +1012,8 @@ char key2char(int key) {
         case KEY_CHAR_MINUS:    return '-';
         case KEY_CHAR_MULT:     return '*';
         case KEY_CHAR_DIV:      return '/';
-        case KEY_CHAR_LBRCKT:   return '(';
-        case KEY_CHAR_RBRCKT:   return ')';
+        case KEY_CHAR_LPAR:     return '(';
+        case KEY_CHAR_RPAR:     return ')';
         case KEY_CHAR_COMMA:    return ',';
         case KEY_CHAR_DP:       return '.';
         case KEY_CHAR_POW:      return '^';
@@ -1076,7 +1076,7 @@ int app() {
 #else
 int main(int argc, char **argv) {
 #endif
-
+    static const char title[] = "============== Formula-Z Renderer =============";
     char buffer[200] = "A+B";
 
     init_graph_app();
@@ -1084,8 +1084,8 @@ int main(int argc, char **argv) {
     all_clr();
 
     while (1) {
-        disp_string(0, 20, "========== Formula-Z Renderer =========");
-        get_string(0, 1 + 28, 20, buffer, sizeof(buffer));
+        disp_string(0, 40, title);
+        get_string(0, 1 + 48, sizeof(title) - 1, buffer, sizeof(buffer));
         
         all_clr();
 
@@ -1098,7 +1098,7 @@ int main(int argc, char **argv) {
 
         if (!check_expr(&analyzer)) {
             disp_set_color(RGB_24_TO_565(255,0 ,0));
-            disp_string(0, 10 + 8, "Syntax Error!");
+            disp_string(0, 48 + 12, "Syntax Error!");
             disp_set_color(RGB_24_TO_565(0, 0, 0));
         }
         else {
@@ -1114,7 +1114,7 @@ int main(int argc, char **argv) {
 
             {
                 int x = 2;
-                int y = 12 + 28;
+                int y = 12 + 48;
                 renderer_node_t *rn = renderer_root;
 
                 disp_set_color(RGB_24_TO_565(55, 155, 55));
