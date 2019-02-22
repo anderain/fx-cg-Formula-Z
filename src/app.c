@@ -3,11 +3,21 @@
 #include "stdlib.h"
 #include "string.h"
 
-#include "graphProvider.h"
-#include "inputProvider.h"
-#include "fontProvider.h"
+// #define CONSOLE_ONLY
 
-#define STREQ(s1, s2) (((s1) != NULL) && ((s2) != NULL) && strcmp((s1), (s2)) == 0)
+#if !defined(CONSOLE_ONLY)
+#   include "graphProvider.h"
+#   include "inputProvider.h"
+#   include "fontProvider.h"
+#   ifdef APP_FXCG
+#       define puts // 
+#       define putchar // 
+#       define printf // 
+#       define max(a, b) ((a) > (b) ? (a) : (b))
+#   endif
+#endif
+
+#define STR_EQUAL(s1, s2) (((s1) != NULL) && ((s2) != NULL) && strcmp((s1), (s2)) == 0)
 #define DEBUG_MSG(s) // puts(s)
 
 #define is_digit(c) ((c) >= '0' && (c) <= '9')
@@ -15,35 +25,61 @@
 #define is_alnum(c) ((is_digit(c)) || (is_alpha(c)))
 #define is_space(c) ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == 'r')
 
-#ifdef APP_FXCG
-#   define puts //
-#   define putchar //
-#   define printf //
-#   define max(a, b) ((a) > (b) ? (a) : (b))
-#endif
+#define TOKEN_LENGTH_MAX 20
 
 typedef enum {
-    ERR, END, NUM, SYM, OPR, FNC, BKT, UDF
+    ERR, END, NUM, SYM, OPR, FNC, BKT, CMA, UDF
 } token_type_t;
 
 const char *DBG_TOKEN_NAME[] = {
-    "ERR", "END", "NUM", "SYM", "OPR", "FNC", "BKT", "UDF"
+    "ERR", "END", "NUM", "SYM", "OPR", "FNC", "BKT", "CMA", "UDF"
+};
+
+const struct {
+    const char *opr;
+    int priority;
+}
+OPR_PRIORITY[] = {
+    { "+",  1 }, { "-",  1 },
+    { "*", 10 }, { "/", 10 },
+    { "^", 20 }, { "%", 20 },
+    { NULL, 0 }
 };
 
 typedef struct tag_token_t {
     token_type_t type;
-    char content[20];
+    char content[TOKEN_LENGTH_MAX];
 } token_t;
 
 typedef struct tag_expr_node_t {
     token_type_t type;
-    char content[20];
-    struct tag_expr_node_t *lchild, *rchild;
+    char content[TOKEN_LENGTH_MAX];
+    struct tag_expr_node_t **children;
+    int child_num;
 } expr_node_t;
+
+#define EN_LCHILD(en) ((en)->children[0])
+#define EN_RCHILD(en) ((en)->children[1])
+
+char *STR_COPY(char *dest, int max, const char *src) {
+    int i;
+    for (i = 0; i < max - 1 && src[i]; ++i) {
+        dest[i] = src[i];
+    }
+    dest[i] = '\0';
+    return dest;
+}
+
+char *STR_DUMP(const char *str) {
+    int length = strlen(str) + 1;
+    char *buffer = (char *)malloc(length);
+    STR_COPY(buffer, length + 1, str);
+    return buffer;
+}
 
 token_t* set_token(token_t *token, token_type_t type, const char *content) {
     token->type = type;
-    strcpy(token->content, content);
+    STR_COPY(token->content, TOKEN_LENGTH_MAX, content);
     return token;
 }
 
@@ -191,12 +227,6 @@ typedef vlist_t vqueue_t;
 #define vq_empty(q) ((q)->size <= 0)
 #define vq_destory(q) vl_destory(q)
 
-char *STR_DUMP(const char *str) {
-    char *buffer = (char *)malloc(strlen(str) + 1);
-    strcpy(buffer, str);
-    return buffer;
-}
-
 token_t* get_token(analyzer_t *_self) {
     char first_char;
     char buffer[100];
@@ -220,6 +250,11 @@ token_t* get_token(analyzer_t *_self) {
         buffer[1] = '\0';
         _self->eptr++;
         return set_token(&_self->token, BKT, buffer);
+    case ',':
+        buffer[0] = first_char;
+        buffer[1] = '\0';
+        _self->eptr++;
+        return set_token(&_self->token, CMA, buffer);
     }
 
     // expr end here 
@@ -243,11 +278,24 @@ token_t* get_token(analyzer_t *_self) {
     }
     // symbol
     else if (is_alpha(first_char)) {
+        int is_func = 0;
+
         while (is_alnum(*_self->eptr)) {
             *pbuffer++ = *_self->eptr++;
         }
+        // func
+        if (*_self->eptr == '(') {
+            _self->eptr++;
+            is_func = 1;
+        }
         *pbuffer = '\0';
-        return set_token(&_self->token, SYM, buffer);
+
+        if (is_func) {
+            return set_token(&_self->token, FNC, buffer);
+        }
+        else {
+            return set_token(&_self->token, SYM, buffer);
+        }
     }
     // undefined
     else {
@@ -267,28 +315,49 @@ void reset_token(analyzer_t *_self) {
     _self->eptr = _self->expr;
 }
 
+int match_expr(analyzer_t *_self);
+
+int match_try_next(analyzer_t *_self) {
+    token_t *next = get_token(_self);
+    if (next->type == OPR) {
+        return match_expr(_self);
+    }
+    else {
+        rewind_token(_self);
+    }
+    return 1;
+}
+
 int match_expr(analyzer_t *_self) {
     token_t *token = get_token(_self);
     // printf("[%s] %s\n", DBG_TOKEN_NAME[token->type], token->content);
     if (token->type == SYM || token->type == NUM) {
-        token_t *next = get_token(_self);
-        if (next->type == OPR) {
-            return match_expr(_self);
-        }
-        else {
-            rewind_token(_self);
-        }
-        return 1;
+        return match_try_next(_self);
     }
-    else if (token->type == OPR && STREQ(token->content, "-")) {
-        return match_expr(_self);
+    else if (token->type == OPR && STR_EQUAL(token->content, "-")) {
+        return match_expr(_self) && match_try_next(_self);
     }
-    else if (token->type == BKT && STREQ(token->content, "(")) {
+    else if (token->type == FNC) {
+        while (1) {
+            int result = match_expr(_self);
+            if (!result)
+                return 0;
+            token = get_token(_self);
+            if (token->type == CMA)
+                continue;
+            else if (token->type == BKT && *token->content == ')')
+                break;
+            else
+                return 0;
+        }
+        return match_try_next(_self);
+    }
+    else if (token->type == BKT && STR_EQUAL(token->content, "(")) {
         int success = match_expr(_self);
         if (!success) return 0;
         token = get_token(_self);
         // printf("A[%s] %s\n", DBG_TOKEN_NAME[token->type], token->content);
-        if (token->type == BKT && STREQ(token->content, ")")) {
+        if (token->type == BKT && STR_EQUAL(token->content, ")")) {
             token_t *next = get_token(_self);
             if (next->type == OPR) {
                 return match_expr(_self);
@@ -298,7 +367,7 @@ int match_expr(analyzer_t *_self) {
             }
             return 1;
         }
-        return 0;
+        return 0; //return match_try_next(_self);
     }
     return 0;
 }
@@ -334,106 +403,217 @@ int check_expr(analyzer_t *_self) {
     return 1;
 }
 
-void travel(expr_node_t *node) {
-    if (node == NULL)
-        return;
-    printf("[%s] %s\n", DBG_TOKEN_NAME[node->type], node->content);
-    travel(node->lchild);
-    travel(node->rchild);
-}
+expr_node_t * en_new(const int type, const char *content, int child_num) {
+    int i;
 
-expr_node_t * expr_node_by_token(const token_t * token) {
     expr_node_t *node = (expr_node_t *)malloc(sizeof(expr_node_t));
 
-    node->type = token->type;
-    strcpy(node->content, token->content);
-    node->lchild = node->rchild = NULL;
+    node->type = type;
+    STR_COPY(node->content, TOKEN_LENGTH_MAX, content);
+
+    node->child_num = child_num;
+    node->children = (expr_node_t **)malloc(child_num * (sizeof(expr_node_t *)));
+    for (i = 0; i < node->child_num; ++i) {
+        node->children[i] = NULL;
+    }
 
     return node;
 }
 
-void destory_expr(expr_node_t *node) {
+
+expr_node_t * en_create_by_token(const token_t * token, int child_num) {
+    return en_new(token->type, token->content, child_num);
+}
+
+void en_destory(expr_node_t *node) {
+    int i;
+
     if (node == NULL) return;
-    destory_expr(node->lchild);
-    destory_expr(node->rchild);
+
+    for (i = 0; i < node->child_num; ++i) {
+        if (node->children[i]) free(node->children[i]);
+    }
+    free(node->children);
+
     free(node);
 }
 
-int operator_priority(const expr_node_t *node) {
-    const char *opr = node->content;
-    if (STREQ(opr, "+") || STREQ(opr, "-")) return 1;
-    if (STREQ(opr, "*") || STREQ(opr, "/") || STREQ(opr, "^") || STREQ(opr, "%")) return 2;
-    return 0;
+expr_node_t* build_expr_tree(analyzer_t *_self);
+
+expr_node_t* build_try_next(analyzer_t *_self, expr_node_t *left_node) {
+    token_t *token = get_token(_self);
+
+    if (token->type == OPR) {
+        expr_node_t *opr_node = en_create_by_token(token, 2);
+        expr_node_t *right_node = build_expr_tree(_self);
+
+        EN_LCHILD(opr_node) = left_node;
+        EN_RCHILD(opr_node) = right_node;
+
+        return opr_node;
+    }
+    else {
+        rewind_token(_self);
+        return left_node;
+    }
+
+    return NULL;
 }
 
 expr_node_t* build_expr_tree(analyzer_t *_self) {
-    token_t     *token;
-    expr_node_t *node;
-    vstack_t    *opr_stack = vs_new_stack(100);
-    vstack_t    *sym_stack = vs_new_stack(100);
+    token_t *token;
 
-    while (1) {
-        token = get_token(_self);
-        if (*token->content != ')')
-            node = expr_node_by_token(token);
+    token = get_token(_self);
+    // printf("token = %s,%s\n", DBG_TOKEN_NAME[token->type], token->content);
 
-        if (token->type == SYM || token->type == NUM) {
-            vs_push(sym_stack, node);
-        }
-        else if (token->type == OPR) {
-            while (!vs_empty(opr_stack)) {
-                expr_node_t *top = (expr_node_t *)vs_top(opr_stack);
-                // printf("PRI = %s(%d), %s(%d)\n", top->content, operator_priority(top), node->content, operator_priority(node));
-                if (operator_priority(top) >= operator_priority(node)) {
-                    vs_pop(opr_stack);
-                    // printf("POP = %d,%s\n", top->type, top->content);
-                    top->rchild = vs_pop(sym_stack);
-                    top->lchild = vs_pop(sym_stack);
-                    vs_push(sym_stack, top);
-                }
-                else {
-                    break;
-                }
+    if (token->type == SYM || token->type == NUM) {
+        expr_node_t *left_node = en_create_by_token(token, 0);
+        return build_try_next(_self, left_node);
+    }
+    else if (token->type == OPR) { // '-'
+        expr_node_t* opr_node = en_create_by_token(token, 1);
+        EN_LCHILD(opr_node) = build_expr_tree(_self);
+        return build_try_next(_self, opr_node);
+    }
+    else if (token->type == FNC) {
+        char *func_name = STR_DUMP(token->content);
+        expr_node_t *func_node = NULL;
+        expr_node_t *child_buf[100];
+        int child_num = 0, i;
+
+        while (1) {
+            expr_node_t *child = build_expr_tree(_self);
+
+            child_buf[child_num++] = child;
+
+            token = get_token(_self);
+            if (token->type == CMA) {
+                continue;
             }
-            vs_push(opr_stack, node);
-        }
-        else if (token->type == BKT) {
-            if (*token->content == '(') {
-                vs_push(opr_stack, node);
-            }
-            else if (*token->content == ')') {
-                while (!vs_empty(opr_stack)) {
-                    expr_node_t *top = (expr_node_t *)vs_pop(opr_stack);
-                    if (top->type == BKT) break;
-                    top->rchild = vs_pop(sym_stack);
-                    top->lchild = vs_pop(sym_stack);
-                    vs_push(sym_stack, top);
-                }
+            else if (token->type == BKT && *token->content == ')') {
+                break;
             }
         }
-        else if (token->type == END) {
-            break;
+
+        func_node = en_new(FNC, func_name, child_num);
+        for (i = 0; i < child_num; ++i) {
+            func_node->children[i] = child_buf[i];
         }
+        free(func_name);
+
+        return build_try_next(_self, func_node);
+    }
+    else if (token->type == BKT && *token->content == '(') {
+        expr_node_t *bkt_node = en_new(BKT, "()", 1);
+        bkt_node->children[0] = build_expr_tree(_self);
+        get_token(_self); // ignore ')'
+
+        return build_try_next(_self, bkt_node);
     }
 
-    while (!vs_empty(opr_stack)) {
-        expr_node_t *top = (expr_node_t *)vs_pop(opr_stack);
-        top->rchild = vs_pop(sym_stack);
-        top->lchild = vs_pop(sym_stack);
-        vs_push(sym_stack, top);
+    return NULL;
+}
+
+expr_node_t* reduce_bkt(expr_node_t * en) {
+    expr_node_t* content;
+
+    if (en == NULL || en->type != BKT) return en;
+
+    content = en->children[0];
+    en->children[0] = NULL;
+
+    en_destory(en);
+
+    return content;
+}
+
+void reduce_all_bkt(expr_node_t * en) {
+    if (en == NULL || en->type == SYM || en->type == NUM) {
+        return;
     }
+    if (STR_EQUAL("/", en->content)) {
+        EN_LCHILD(en) = reduce_bkt(EN_LCHILD(en));
+        EN_RCHILD(en) = reduce_bkt(EN_RCHILD(en));
+    }
+    reduce_all_bkt(EN_LCHILD(en));
+    reduce_all_bkt(EN_RCHILD(en));
+}
 
-    // travel((expr_node_t *)vs_top(sym_stack));
-    node = vs_top(sym_stack);
+int opr_priority(const expr_node_t *node) {
+    int i;
+    for (i = 0; OPR_PRIORITY[i].opr; ++i) {
+        if (STR_EQUAL(OPR_PRIORITY[i].opr, node->content)) {
+            return OPR_PRIORITY[i].priority;
+        }
+    }
+    return -1;
+}
 
-    vs_free(opr_stack);
-    vs_free(sym_stack);
+expr_node_t* sort_expr_tree(expr_node_t *en, int *ptr_change_flag) {
+    if (en == NULL) {
+        return NULL;
+    }
+    else if (en->type == FNC || en->type == BKT) {
+        int i;
+        for (i = 0; i < en->child_num; ++i) {
+            en->children[i] = sort_expr_tree(en->children[i], ptr_change_flag);
+        }
+        return en;
+    }
+    else if (en->type == OPR) {
+        expr_node_t *enr, *a, *b;
+        /*
+        上一步中 1/2+3 会被解析成如下的表达式树
+            (/) en
+            / \
+           /   \
+         (1)  (+) enr
+         c    / \
+             /   \
+           (2)   (3)
+            a     b
 
-    return node;
+        '/'的优先级比'+'高，所以进行排序
+            (+) enr
+            / \
+           /   \
+      en (/)   (3) b
+         / \
+        /   \
+      (1)   (2) a
+        */
+        EN_LCHILD(en) = sort_expr_tree(EN_LCHILD(en), ptr_change_flag);
+        EN_RCHILD(en) = sort_expr_tree(EN_RCHILD(en), ptr_change_flag);
+        enr = EN_RCHILD(en);
+
+        if (enr->type == OPR && opr_priority(en) >= opr_priority(enr)) {
+            *ptr_change_flag = 1;
+            
+            a = EN_LCHILD(enr);
+            b = EN_RCHILD(enr);
+            EN_RCHILD(en) = a;
+            EN_LCHILD(enr) = en;
+
+            EN_RCHILD(enr) = sort_expr_tree(EN_RCHILD(enr), ptr_change_flag);
+
+            return enr;
+        }
+    }
+    return en;
+}
+
+void sort_expr(expr_node_t ** ptr_en) {
+    int change_flag;
+
+    do {
+        change_flag = 0;
+        *ptr_en = sort_expr_tree(*ptr_en, &change_flag);
+    } while (change_flag);
 }
 
 #define RNTYP_NODE 1
 #define RNTYP_TEXT 2
+#define RNTYP_FUNC 3
 
 typedef struct tag_renderer_node_t {
     int type;
@@ -447,7 +627,7 @@ renderer_node_t * rn_new(int type, const char *content) {
     renderer_node_t * renderer = (renderer_node_t *)malloc(sizeof(renderer_node_t));
     renderer->type = type;
     renderer->content = content ? STR_DUMP(content) : NULL;
-    renderer->children = type == RNTYP_NODE ? vl_new_list() : NULL;
+    renderer->children = type == RNTYP_NODE || type == RNTYP_FUNC ? vl_new_list() : NULL;
     renderer->width = 0;
     renderer->height = 0;
     return renderer;
@@ -461,56 +641,107 @@ void rn_destory(renderer_node_t *_self) {
     free(_self);
 }
 
-void build_renderer(expr_node_t *node, expr_node_t *parent, renderer_node_t *renderer) {
-    int need_bkt = 0;
-    int parent_is_div = parent && parent->type == OPR && STREQ(parent->content, "/");
-
-    if (node->type == SYM || node->type == NUM) {
-        vl_push_back(renderer->children, rn_new(RNTYP_TEXT, node->content));
-        return;
+void build_renderer(expr_node_t *en, renderer_node_t *renderer) {
+    if (en->type == SYM || en->type == NUM) {
+        vl_push_back(renderer->children, rn_new(RNTYP_TEXT, en->content));
     }
+    else if (en->type == OPR) {
+        if (STR_EQUAL(en->content, "/") || STR_EQUAL(en->content, "^")) {
+            renderer_node_t *l = rn_new(RNTYP_NODE, "up");
+            renderer_node_t *r = rn_new(RNTYP_NODE, "down");
+            renderer_node_t *opr = rn_new(RNTYP_NODE, en->content);
 
-    if (parent != NULL) {
-        if (!parent_is_div && operator_priority(node) < operator_priority(parent)) {
-            need_bkt = 1;
+            build_renderer(EN_LCHILD(en), l);
+            build_renderer(EN_RCHILD(en), r);
+
+            vl_push_back(opr->children, l);
+            vl_push_back(opr->children, r);
+            vl_push_back(renderer->children, opr);
+        }
+        else {
+            build_renderer(EN_LCHILD(en), renderer);
+            vl_push_back(renderer->children, rn_new(RNTYP_TEXT, en->content));
+            build_renderer(EN_RCHILD(en), renderer);
         }
     }
+    else if (en->type == BKT) {
+        renderer_node_t *bkt = rn_new(RNTYP_NODE, "(bkt)");
+        renderer_node_t *inner = rn_new(RNTYP_NODE, "inner");
+        int i;
+        for (i = 0; i < en->child_num; ++i) {
+            build_renderer(en->children[i], inner);
+        }
+        vl_push_back(bkt->children, inner);
+        vl_push_back(renderer->children, bkt);
+    }
+    else if (en->type == FNC) {
+        renderer_node_t *func = rn_new(RNTYP_FUNC, en->content);
+        renderer_node_t *inner = rn_new(RNTYP_NODE, "inner");
+        int i;
+        for (i = 0; i < en->child_num; ++i) {
+            build_renderer(en->children[i], inner);
+            if (i < en->child_num - 1)
+                vl_push_back(inner->children, rn_new(RNTYP_TEXT, ","));
+        }
+        vl_push_back(func->children, inner);
+        vl_push_back(renderer->children, func);
+    }
+}
 
-    if (node->type == OPR && (STREQ(node->content, "/") || STREQ(node->content, "^"))) {
-        renderer_node_t * rn_self = rn_new(RNTYP_NODE, node->content);
-        renderer_node_t * rn_left = rn_new(RNTYP_NODE, NULL);
-        renderer_node_t * rn_right = rn_new(RNTYP_NODE, NULL);
+void travel_expr(expr_node_t *en, int tab) {
+    int i;
+    for (int i = 0; i < tab; ++i) printf(" ");
+    if (en->child_num > 0) {
+        printf("<en text=\"%s\">\n", en->content);
 
-        vl_push_back(rn_self->children, rn_left);
-        vl_push_back(rn_self->children, rn_right);
+        for (i = 0; i < en->child_num; ++i) {
+            travel_expr(en->children[i], tab + 2);
+        }
 
-        if (node->lchild) build_renderer(node->lchild, node, rn_left);
-
-        if (node->rchild) build_renderer(node->rchild, node, rn_right);
-
-        vl_push_back(renderer->children, rn_self);
+        for (int i = 0; i < tab; ++i) printf(" "); printf("</en>\n");
     }
     else {
-        if (need_bkt) vl_push_back(renderer->children, rn_new(RNTYP_TEXT, "("));
-
-        if (node->lchild) build_renderer(node->lchild, node, renderer);
-
-        vl_push_back(renderer->children, rn_new(RNTYP_TEXT, node->content));
-
-        if (node->rchild) build_renderer(node->rchild, node, renderer);
-
-        if (need_bkt) vl_push_back(renderer->children, rn_new(RNTYP_TEXT, ")"));
+        printf("%s\n", en->content);
     }
-
 }
+
+void travel_renderer(renderer_node_t *rn, int tab) {
+    int i;
+    for (i = 0; i < tab; ++i) printf(" ");
+    if (rn->type != RNTYP_TEXT) {
+        vlist_node_t * node;
+        printf("<rn text=\"%s\" type=\"%d\">\n", rn->content ? rn->content : "NULL", rn->type);
+
+        for (node = rn->children->head; node; node = node->next) {
+            travel_renderer((renderer_node_t *)node->data, tab + 2);
+        }
+
+        for (i = 0; i < tab; ++i) printf(" "); printf("</rn>\n");
+    }
+    else {
+        printf("%s\n", rn->content);
+    }
+}
+
+#if !defined(CONSOLE_ONLY)
 
 void test_size(renderer_node_t * rn) {
     if (rn->type == RNTYP_TEXT) {
         rn->width = strlen(rn->content) * FONT_WIDTH_PX;
         rn->height = FONT_HEIGHT_PX;
     }
+    else if (rn->type == RNTYP_FUNC) {
+        renderer_node_t *content = (renderer_node_t *)rn->children->head->data;
+
+        test_size(content);
+
+        rn->width = content->width + 3 + 3 + 1 + strlen(rn->content) * FONT_WIDTH_PX;
+        rn->height = content->height;
+
+        printf("test inner %d, %d\n", rn->width, rn->height);
+    }
     else if (rn->type == RNTYP_NODE) {
-        if (STREQ(rn->content, "/")) {
+        if (STR_EQUAL(rn->content, "/")) {
             renderer_node_t *num = (renderer_node_t *)rn->children->head->data;
             renderer_node_t *den = (renderer_node_t *)rn->children->tail->data;
 
@@ -518,9 +749,9 @@ void test_size(renderer_node_t * rn) {
             test_size(den);
 
             rn->width = max(num->width, den->width) + 2;
-            rn->height = num->height + den->height + 1;
+            rn->height = num->height + den->height + 2;
         }
-        else if (STREQ(rn->content, "^")) {
+        else if (STR_EQUAL(rn->content, "^")) {
             renderer_node_t *left = (renderer_node_t *)rn->children->head->data;
             renderer_node_t *right = (renderer_node_t *)rn->children->tail->data;
 
@@ -528,7 +759,17 @@ void test_size(renderer_node_t * rn) {
             test_size(right);
 
             rn->width = left->width + right->width;
-            rn->height = left->height + right->height - FONT_HEIGHT_PX / 2;
+            rn->height = left->height + right->height / 2;
+        }
+        else if (STR_EQUAL(rn->content, "(bkt)")) {
+            renderer_node_t *content = (renderer_node_t *)rn->children->head->data;
+            
+            test_size(content);
+
+            rn->width = content->width + 3 + 3;
+            rn->height = content->height;
+
+            printf("test inner %d, %d\n", rn->width, rn->height);
         }
         else {
             int width = 0;
@@ -541,7 +782,7 @@ void test_size(renderer_node_t * rn) {
                 test_size(child);
                 width += child->width;
                 if (child->type == RNTYP_NODE) {
-                    if (STREQ(child->content, "/")) {
+                    if (STR_EQUAL(child->content, "/")) {
                         renderer_node_t *num = (renderer_node_t *)child->children->head->data;
                         renderer_node_t *den = (renderer_node_t *)child->children->tail->data;
                         int test_top = FONT_HEIGHT_PX / 2 - 1 - num->height;
@@ -549,38 +790,36 @@ void test_size(renderer_node_t * rn) {
                         if (test_top < top) top = test_top;
                         if (test_bottom > bottom) bottom = test_bottom;
                     }
-                    else if (STREQ(child->content, "^")) {
+                    else if (STR_EQUAL(child->content, "^")) {
                         renderer_node_t *left = (renderer_node_t *)child->children->head->data;
                         renderer_node_t *right = (renderer_node_t *)child->children->tail->data;
                         int test_top = FONT_HEIGHT_PX / 2 - left->height / 2 - right->height / 2;
-                        int test_bottom = FONT_HEIGHT_PX / 2 + right->height / 2;
+                        int test_bottom = FONT_HEIGHT_PX / 2 + left->height / 2;
                         if (test_top < top) top = test_top;
                         if (test_bottom > bottom) bottom = test_bottom;
                     }
+                    else if (STR_EQUAL(child->content, "(bkt)")) {
+                        renderer_node_t *one = (renderer_node_t *)child->children->head->data;
+                        int test_top = FONT_HEIGHT_PX / 2 - one->height / 2;
+                        int test_bottom = FONT_HEIGHT_PX / 2 + one->height / 2;
+                        if (test_top < top) top = test_top;
+                        if (test_bottom > bottom) bottom = test_bottom;
+                        printf("test %s %d, %d\n", child->content, test_top, test_bottom);
+                    }
+                }
+                else if (child->type == RNTYP_FUNC) {
+                    renderer_node_t *one = (renderer_node_t *)child->children->head->data;
+                    int test_top = FONT_HEIGHT_PX / 2 - one->height / 2;
+                    int test_bottom = FONT_HEIGHT_PX / 2 + one->height / 2;
+                    if (test_top < top) top = test_top;
+                    if (test_bottom > bottom) bottom = test_bottom;
+                    printf("test %s %d, %d\n", child->content, test_top, test_bottom);
                 }
             }
             rn->width = width;
             rn->height = bottom - top;
         }
     }
-}
-
-void test_travel_renderer(renderer_node_t *rn) {
-    vlist_node_t *ln = rn->children->head;
-
-    printf("<node tag='%s'>", rn->content ? rn->content : "");
-
-    for (; ln; ln = ln->next) {
-        renderer_node_t *rn = (renderer_node_t *)ln->data;
-        if (rn->type == RNTYP_TEXT) {
-            printf("%s ", rn->content);
-        }
-        else if (rn->type == RNTYP_NODE) {
-            test_travel_renderer(rn);
-        }
-    }
-
-    printf("</node>");
 }
 
 void render(int *x, int *y, renderer_node_t *rn) {
@@ -592,11 +831,39 @@ void render(int *x, int *y, renderer_node_t *rn) {
             *x += FONT_WIDTH_PX;
         }
     }
+    else if (rn->type == RNTYP_FUNC) {
+        int ox = *x;
+        int oy = *y;
+
+        int i;
+
+        renderer_node_t *one = (renderer_node_t *)rn->children->head->data;
+
+        for (i = 0; rn->content[i]; ++i) {
+            disp_char(*x, *y, rn->content[i]);
+            *x += FONT_WIDTH_PX;
+        }
+
+        *x += 1;
+        *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
+        disp_bkt(*x, *y, one->height, 1);
+
+        *x += 3;
+        *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
+        render(x, y, one);
+
+        *x = ox + rn->width;
+        *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
+        
+        disp_bkt(*x, *y, one->height, 0);
+
+        *y = oy;
+    }
     else if (rn->type == RNTYP_NODE) {
         int ox = *x;
         int oy = *y;
 
-        if (STREQ(rn->content, "/")) {
+        if (STR_EQUAL(rn->content, "/")) {
             renderer_node_t *num = (renderer_node_t *)rn->children->head->data;
             renderer_node_t *den = (renderer_node_t *)rn->children->tail->data;
 
@@ -613,7 +880,7 @@ void render(int *x, int *y, renderer_node_t *rn) {
             *x = ox + rn->width;
             *y = oy;
         }
-        else if (STREQ(rn->content, "^")) {
+        else if (STR_EQUAL(rn->content, "^")) {
             renderer_node_t *left = (renderer_node_t *)rn->children->head->data;
             renderer_node_t *right = (renderer_node_t *)rn->children->tail->data;
 
@@ -628,6 +895,22 @@ void render(int *x, int *y, renderer_node_t *rn) {
             *x = ox + rn->width;
             *y = oy;
         }
+        else if (STR_EQUAL(rn->content, "(bkt)")) {
+            renderer_node_t *one = (renderer_node_t *)rn->children->head->data;
+
+            *x = ox + 3;
+            *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
+            render(x, y, one);
+
+            *x = ox;
+            *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
+
+            disp_bkt(*x, *y, one->height, 1);
+            disp_bkt(*x + rn->width, *y, one->height, 0);
+
+            *x = ox + rn->width;
+            *y = oy;
+        }
         else {
             int top = 0;
             //int bottom = FONT_HEIGHT_PX;
@@ -638,18 +921,30 @@ void render(int *x, int *y, renderer_node_t *rn) {
                 renderer_node_t *child = (renderer_node_t *)node->data;
 
                 if (child->type == RNTYP_NODE) {
-                    if (STREQ(child->content, "/")) {
+                    if (STR_EQUAL(child->content, "/")) {
                         renderer_node_t *num = (renderer_node_t *)child->children->head->data;
                         int test_top = FONT_HEIGHT_PX / 2 - 1 - num->height;
                         if (test_top < top) top = test_top;
                     }
-                    else if (STREQ(child->content, "^")) {
+                    else if (STR_EQUAL(child->content, "^")) {
                         renderer_node_t *left = (renderer_node_t *)child->children->head->data;
                         renderer_node_t *right = (renderer_node_t *)child->children->tail->data;
                         int test_top = FONT_HEIGHT_PX / 2 - left->height / 2 - right->height / 2;
                         // int test_bottom = FONT_HEIGHT_PX / 2 + right->height / 2;
                         if (test_top < top) top = test_top;
                     }
+                    else if (STR_EQUAL(child->content, "(bkt)")) {
+                        renderer_node_t *one = (renderer_node_t *)child->children->head->data;
+                        int test_top = FONT_HEIGHT_PX / 2 - one->height / 2;
+
+                        if (test_top < top) top = test_top;
+                    }
+                }
+                else if (child->type == RNTYP_FUNC) {
+                    renderer_node_t *one = (renderer_node_t *)child->children->head->data;
+                    int test_top = FONT_HEIGHT_PX / 2 - one->height / 2;
+
+                    if (test_top < top) top = test_top;
                 }
             }
 
@@ -664,48 +959,54 @@ void render(int *x, int *y, renderer_node_t *rn) {
         }
     }
 }
+#endif
 
 #if defined(APP_MSVC)
 int app() {
 #else
-int main() {
+int main(int argc, char **argv) {
 #endif
     analyzer_t analyzer;
     expr_node_t *expr_root;
     renderer_node_t *renderer_root = rn_new(RNTYP_NODE, "root");
-
-    analyzer.expr = "A+(1/2)^(3/4)+5*(1+(2+C/D)/3)";
+    analyzer.expr = "a^b/c+sin(5)^5/6^2";
     reset_token(&analyzer);
 
     printf("SYNTAX CHECK = %s\n", check_expr(&analyzer) ? "SUCCESS" : "FAIL");
     expr_root = build_expr_tree(&analyzer);
-    travel(expr_root);
-    build_renderer(expr_root, NULL, renderer_root);
-
+    travel_expr(expr_root, 0);
+    sort_expr(&expr_root);
+    reduce_all_bkt(expr_root);
+    travel_expr(expr_root, 0);
+    build_renderer(expr_root, renderer_root);
+    travel_renderer(renderer_root, 0);
+#ifndef CONSOLE_ONLY
     test_size(renderer_root);
     printf("size=%d,%d\n", renderer_root->width, renderer_root->height);
-    test_travel_renderer(renderer_root);
 
     init_graph_app();
 
     all_clr();
     {
-        int x = 9 * 6;
-        int y = 16;
-        disp_string(0, 0, "INPUT = ");
-        disp_string(8 * 6, 0, analyzer.expr);
-        disp_string(0, 8, "====================================");
-        disp_string(0, 16 + (renderer_root->height - FONT_HEIGHT_PX) / 2, "OUTPUT = ");
+        int x = 10;
+        int y = 10;
+        renderer_node_t *rn = renderer_root;
+
+        disp_line(x - 1, y - 1, x + rn->width + 1, y - 1);
+        disp_line(x - 1, y + 1 + rn->height, x + rn->width + 1, y + 1 + rn->height);
+        disp_line(x - 1, y - 1, x - 1, y + 1 + rn->height);
+        disp_line(x + 1 + rn->width, y - 1, x + 1 + rn->width, y + 1 + rn->height);
+
         render(&x, &y, renderer_root);
     }
-    
 
     put_disp();
-    
+
     while (wait_key()) {
     }
-
-    destory_expr(expr_root);
+#endif
+    rn_destory(renderer_root);
+    en_destory(expr_root);
 
     return 0;
 }
