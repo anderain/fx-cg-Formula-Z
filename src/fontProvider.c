@@ -19,32 +19,47 @@ void disp_bkt(int x, int y, int height, int is_left) {
     }
 }
 
-void disp_line(int x1, int y1, int x2, int y2) {
-    if (x1 == x2) {
-        int y;
-        for (y = y1; y <= y2; ++y) {
-            set_pixel(x1, y, disp_color);
+
+void disp_line(int x0, int y0, int x1, int y1)
+{
+    int dx = abs(x1 - x0);
+    int dy = abs(y1 - y0);
+    int x = x0;
+    int y = y0;
+    int stepX = 1;
+    int stepY = 1;
+    if (x0 > x1)
+        stepX = -1;
+    if (y0 > y1)
+        stepY = -1;
+    int i;
+
+    if (dx > dy) {
+        int e = dy * 2 - dx;
+        for (i = 0; i <= dx; i++) {
+            set_pixel(x, y, disp_color);
+            x += stepX;
+            e += dy;
+            if (e >= 0) {
+                y += stepY;
+                e -= dx;
+            }
         }
     }
     else {
-        int x, y, dx, dy, d;
-        y = y1;
-        dx = x2 - x1;
-        dy = y2 - y1;
-        d = 2 * dy - dx;
-        for (x = x1; x <= x2; x++) {
+        int e = 2 * dx - dy;
+        for (i = 0; i <= dy; i++) {
             set_pixel(x, y, disp_color);
-            if (d < 0) {
-                d += 2 * dy;
-            }
-            else {
-                y++;
-                d += 2 * dy - 2 * dx;
+            y += stepY;
+            e += dx;
+            if (e >= 0) {
+                x += stepX;
+                e -= dy;
             }
         }
     }
-
 }
+
 
 void disp_char(int x, int y, int c) {
     int i, j, offset;

@@ -690,7 +690,7 @@ void build_renderer(expr_node_t *en, renderer_node_t *renderer) {
 
 void travel_expr(expr_node_t *en, int tab) {
     int i;
-    for (int i = 0; i < tab; ++i) printf(" ");
+    for (i = 0; i < tab; ++i) printf(" ");
     if (en->child_num > 0) {
         printf("<en text=\"%s\">\n", en->content);
 
@@ -698,7 +698,7 @@ void travel_expr(expr_node_t *en, int tab) {
             travel_expr(en->children[i], tab + 2);
         }
 
-        for (int i = 0; i < tab; ++i) printf(" "); printf("</en>\n");
+        for (i = 0; i < tab; ++i) printf(" "); printf("</en>\n");
     }
     else {
         printf("%s\n", en->content);
@@ -731,14 +731,22 @@ void test_size(renderer_node_t * rn) {
         rn->height = FONT_HEIGHT_PX;
     }
     else if (rn->type == RNTYP_FUNC) {
-        renderer_node_t *content = (renderer_node_t *)rn->children->head->data;
+        if (STR_EQUAL("SQRT", rn->content)) {
+            renderer_node_t *content = (renderer_node_t *)rn->children->head->data;
 
-        test_size(content);
+            test_size(content);
 
-        rn->width = content->width + 3 + 3 + 1 + strlen(rn->content) * FONT_WIDTH_PX;
-        rn->height = content->height;
+            rn->width = content->width + 2 + 3;
+            rn->height = content->height + 2;
+        }
+        else {
+            renderer_node_t *content = (renderer_node_t *)rn->children->head->data;
 
-        printf("test inner %d, %d\n", rn->width, rn->height);
+            test_size(content);
+
+            rn->width = content->width + 3 + 3 + 1 + strlen(rn->content) * FONT_WIDTH_PX;
+            rn->height = content->height;
+        }
     }
     else if (rn->type == RNTYP_NODE) {
         if (STR_EQUAL(rn->content, "/")) {
@@ -808,12 +816,19 @@ void test_size(renderer_node_t * rn) {
                     }
                 }
                 else if (child->type == RNTYP_FUNC) {
-                    renderer_node_t *one = (renderer_node_t *)child->children->head->data;
-                    int test_top = FONT_HEIGHT_PX / 2 - one->height / 2;
-                    int test_bottom = FONT_HEIGHT_PX / 2 + one->height / 2;
-                    if (test_top < top) top = test_top;
-                    if (test_bottom > bottom) bottom = test_bottom;
-                    printf("test %s %d, %d\n", child->content, test_top, test_bottom);
+                    if (STR_EQUAL("SQRT", child->content)) {
+                        int test_top = FONT_HEIGHT_PX / 2 - child->height / 2;
+                        int test_bottom = FONT_HEIGHT_PX / 2 + child->height / 2;
+                        if (test_top < top) top = test_top;
+                        if (test_bottom > bottom) bottom = test_bottom;
+                    }
+                    else {
+                        renderer_node_t *one = (renderer_node_t *)child->children->head->data;
+                        int test_top = FONT_HEIGHT_PX / 2 - one->height / 2;
+                        int test_bottom = FONT_HEIGHT_PX / 2 + one->height / 2;
+                        if (test_top < top) top = test_top;
+                        if (test_bottom > bottom) bottom = test_bottom;
+                    }
                 }
             }
             rn->width = width;
@@ -834,30 +849,47 @@ void render(int *x, int *y, renderer_node_t *rn) {
     else if (rn->type == RNTYP_FUNC) {
         int ox = *x;
         int oy = *y;
+        if (STR_EQUAL("SQRT", rn->content)) {
+            int fy;
+            renderer_node_t *one = (renderer_node_t *)rn->children->head->data;
 
-        int i;
+            *x += 5;
+            *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2 + 2;
+            fy = *y - 2;
+            render(x, y, one);
 
-        renderer_node_t *one = (renderer_node_t *)rn->children->head->data;
+            disp_line(ox, fy + rn->height - 5, ox + 2, fy + rn->height - 3);
+            disp_line(ox + 2, fy + rn->height - 3, ox + 4, fy);
+            disp_line(ox + 4, fy, ox + rn->width, fy);
 
-        for (i = 0; rn->content[i]; ++i) {
-            disp_char(*x, *y, rn->content[i]);
-            *x += FONT_WIDTH_PX;
+            *x = ox + rn->width;
+            *y = oy;
         }
+        else {
+            int i;
 
-        *x += 1;
-        *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
-        disp_bkt(*x, *y, one->height, 1);
+            renderer_node_t *one = (renderer_node_t *)rn->children->head->data;
 
-        *x += 3;
-        *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
-        render(x, y, one);
+            for (i = 0; rn->content[i]; ++i) {
+                disp_char(*x, *y, rn->content[i]);
+                *x += FONT_WIDTH_PX;
+            }
 
-        *x = ox + rn->width;
-        *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
-        
-        disp_bkt(*x, *y, one->height, 0);
+            *x += 1;
+            *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
+            disp_bkt(*x, *y, one->height, 1);
 
-        *y = oy;
+            *x += 3;
+            *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
+            render(x, y, one);
+
+            *x = ox + rn->width;
+            *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
+
+            disp_bkt(*x, *y, one->height, 0);
+
+            *y = oy;
+        }
     }
     else if (rn->type == RNTYP_NODE) {
         int ox = *x;
@@ -941,10 +973,17 @@ void render(int *x, int *y, renderer_node_t *rn) {
                     }
                 }
                 else if (child->type == RNTYP_FUNC) {
-                    renderer_node_t *one = (renderer_node_t *)child->children->head->data;
-                    int test_top = FONT_HEIGHT_PX / 2 - one->height / 2;
+                    if (STR_EQUAL("SQRT", child->content)) {
+                        int test_top = FONT_HEIGHT_PX / 2 - child->height / 2;
 
-                    if (test_top < top) top = test_top;
+                        if (test_top < top) top = test_top;
+                    }
+                    else {
+                        renderer_node_t *one = (renderer_node_t *)child->children->head->data;
+                        int test_top = FONT_HEIGHT_PX / 2 - one->height / 2;
+
+                        if (test_top < top) top = test_top;
+                    }
                 }
             }
 
@@ -961,52 +1000,146 @@ void render(int *x, int *y, renderer_node_t *rn) {
 }
 #endif
 
+char key2char(int key) {
+    if (key >= KEY_CHAR_0 && key <= KEY_CHAR_9) {
+        return '0' + (key - KEY_CHAR_0);
+    }
+    if (key >= KEY_CHAR_A && key <= KEY_CHAR_Z) {
+        return 'A' + (key - KEY_CHAR_A);
+    }
+    switch (key) {
+        case KEY_CHAR_PLUS:     return '+';
+        case KEY_CHAR_MINUS:    return '-';
+        case KEY_CHAR_MULT:     return '*';
+        case KEY_CHAR_DIV:      return '/';
+        case KEY_CHAR_LBRCKT:   return '(';
+        case KEY_CHAR_RBRCKT:   return ')';
+        case KEY_CHAR_COMMA:    return ',';
+        case KEY_CHAR_DP:       return '.';
+        case KEY_CHAR_POW:      return '^';
+    }
+    return 0;
+}
+
+void get_string(const int x, const int y, const int char_width, char *buffer, const int max) {
+    int length = strlen(buffer);
+    
+    while (1) {
+        unsigned int key;
+        // redraw
+        {
+            int left = 0, i;
+            int tx, ty;
+            
+            for (tx = x; tx < x + char_width * FONT_WIDTH_PX; ++tx) {
+                for (ty = y; ty < y + FONT_HEIGHT_PX; ++ty) {
+                    set_pixel(tx, ty, 0xffff);
+                }
+            }
+
+            if (length > char_width - 1) {
+                left = length - char_width + 1;
+            }
+
+            for (i = left; i < length; ++i) {
+                disp_char(x + FONT_WIDTH_PX * (i - left), y, buffer[i]);
+            }
+            disp_char(x + FONT_WIDTH_PX * (i - left), y, '_');
+        }
+#ifdef APP_MSVC
+        put_disp();
+#endif
+        key = wait_key();
+        if (key == KEY_CTRL_EXE) {
+            buffer[length] = '\0';
+            return;
+        }
+        else if (key == KEY_CTRL_DEL) {
+            if (length >= 0) length--;
+        }
+#ifdef APP_MSVC
+        else if (key == 0) {
+            exit(0);
+        }
+#endif
+        else {
+            char c = key2char(key);
+            if (c) {
+                buffer[length++] = c;
+            }
+        }
+    }
+}
+
 #if defined(APP_MSVC)
 int app() {
 #else
 int main(int argc, char **argv) {
 #endif
-    analyzer_t analyzer;
-    expr_node_t *expr_root;
-    renderer_node_t *renderer_root = rn_new(RNTYP_NODE, "root");
-    analyzer.expr = "a^b/c+sin(5)^5/6^2";
-    reset_token(&analyzer);
 
-    printf("SYNTAX CHECK = %s\n", check_expr(&analyzer) ? "SUCCESS" : "FAIL");
-    expr_root = build_expr_tree(&analyzer);
-    travel_expr(expr_root, 0);
-    sort_expr(&expr_root);
-    reduce_all_bkt(expr_root);
-    travel_expr(expr_root, 0);
-    build_renderer(expr_root, renderer_root);
-    travel_renderer(renderer_root, 0);
-#ifndef CONSOLE_ONLY
-    test_size(renderer_root);
-    printf("size=%d,%d\n", renderer_root->width, renderer_root->height);
+    char buffer[200] = "A+B";
 
     init_graph_app();
 
     all_clr();
-    {
-        int x = 10;
-        int y = 10;
-        renderer_node_t *rn = renderer_root;
 
-        disp_line(x - 1, y - 1, x + rn->width + 1, y - 1);
-        disp_line(x - 1, y + 1 + rn->height, x + rn->width + 1, y + 1 + rn->height);
-        disp_line(x - 1, y - 1, x - 1, y + 1 + rn->height);
-        disp_line(x + 1 + rn->width, y - 1, x + 1 + rn->width, y + 1 + rn->height);
+    while (1) {
+        disp_string(0, 20, "========== Formula-Z Renderer =========");
+        get_string(0, 1 + 28, 20, buffer, sizeof(buffer));
+        
+        all_clr();
 
-        render(&x, &y, renderer_root);
+        analyzer_t analyzer;
+        expr_node_t *expr_root;
+        renderer_node_t *renderer_root = rn_new(RNTYP_NODE, "root");
+
+        analyzer.expr = buffer;
+        reset_token(&analyzer);
+
+        if (!check_expr(&analyzer)) {
+            disp_set_color(RGB_24_TO_565(255,0 ,0));
+            disp_string(0, 10 + 8, "Syntax Error!");
+            disp_set_color(RGB_24_TO_565(0, 0, 0));
+        }
+        else {
+            expr_root = build_expr_tree(&analyzer);
+            travel_expr(expr_root, 0);
+            sort_expr(&expr_root);
+            // reduce_all_bkt(expr_root);
+            travel_expr(expr_root, 0);
+            build_renderer(expr_root, renderer_root);
+            travel_renderer(renderer_root, 0);
+            test_size(renderer_root);
+            printf("size=%d,%d\n", renderer_root->width, renderer_root->height);
+
+            {
+                int x = 2;
+                int y = 12 + 28;
+                renderer_node_t *rn = renderer_root;
+
+                disp_set_color(RGB_24_TO_565(55, 155, 55));
+                disp_line(x - 1, y - 1, x + rn->width + 1, y - 1);
+                disp_line(x - 1, y + 1 + rn->height, x + rn->width + 1, y + 1 + rn->height);
+                disp_line(x - 1, y - 1, x - 1, y + 1 + rn->height);
+                disp_line(x + 1 + rn->width, y - 1, x + 1 + rn->width, y + 1 + rn->height);
+                disp_set_color(RGB_24_TO_565(0, 0, 0));
+
+                render(&x, &y, renderer_root);
+            }
+
+            put_disp();
+
+            rn_destory(renderer_root);
+            en_destory(expr_root);
+        }
     }
 
-    put_disp();
-
-    while (wait_key()) {
-    }
-#endif
-    rn_destory(renderer_root);
-    en_destory(expr_root);
+    // while (1) {
+    //     int key = wait_key();
+    //     printf("%c = %d\n", key, key);
+    //     if (key == 0)
+    //         break;
+    // }
 
     return 0;
 }

@@ -18,6 +18,45 @@
 #       define KEY_CHAR_7 0x107
 #       define KEY_CHAR_8 0x108
 #       define KEY_CHAR_9 0x109
+#       define KEY_CHAR_A 'a'
+#       define KEY_CHAR_B 'b'
+#       define KEY_CHAR_C 'c'
+#       define KEY_CHAR_D 'd'
+#       define KEY_CHAR_E 'e'
+#       define KEY_CHAR_F 'f'
+#       define KEY_CHAR_G 'g'
+#       define KEY_CHAR_H 'h'
+#       define KEY_CHAR_I 'i'
+#       define KEY_CHAR_J 'j'
+#       define KEY_CHAR_K 'k'
+#       define KEY_CHAR_L 'l'
+#       define KEY_CHAR_M 'm'
+#       define KEY_CHAR_N 'n'
+#       define KEY_CHAR_I 'i'
+#       define KEY_CHAR_P 'p'
+#       define KEY_CHAR_Q 'q'
+#       define KEY_CHAR_R 'r'
+#       define KEY_CHAR_S 's'
+#       define KEY_CHAR_T 't'
+#       define KEY_CHAR_U 'u'
+#       define KEY_CHAR_V 'v'
+#       define KEY_CHAR_W 'w'
+#       define KEY_CHAR_X 'x'
+#       define KEY_CHAR_Y 'y'
+#       define KEY_CHAR_Z 'z'
+#       define KEY_CHAR_Y 'y'
+#       define KEY_CHAR_Z 'z'
+#       define KEY_CHAR_PLUS        270
+#       define KEY_CHAR_MINUS       269
+#       define KEY_CHAR_MULT        268
+#       define KEY_CHAR_DIV         267
+#       define KEY_CHAR_LBRCKT      290 /* F9 */
+#       define KEY_CHAR_RBRCKT      291 /* F10 */
+#       define KEY_CHAR_COMMA       ','
+#       define KEY_CHAR_DP          '.'
+#       define KEY_CTRL_EXE         0xd
+#       define KEY_CTRL_DEL         127
+#       define KEY_CHAR_POW         292 /* F11 */         
 #   elif defined(APP_FXCG)
 #       include <keyboard_syscalls.h>
 #       include <keyboard.hpp>
