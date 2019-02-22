@@ -43,4 +43,5 @@
 [a]   [b]
 ```
 ## (5)
-渲染表达式树
+渲染表达式树  
+![cg_preview](./assets/cg_preview.jpg)
