@@ -2,6 +2,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include "eigenmath/defs.h"
 
 // #define CONSOLE_ONLY
 
@@ -28,11 +29,13 @@
 #define TOKEN_LENGTH_MAX 20
 
 typedef enum {
-    ERR, END, NUM, SYM, OPR, FNC, BKT, CMA, UDF
+    TOKEN_ERR, TOKEN_END, TOKEN_NUM,
+    TOKEN_SYM, TOKEN_OPR, TOKEN_FNC,
+    TOKEN_BKT, TOKEN_CMA, TOKEN_UDF
 } token_type_t;
 
 const char *DBG_TOKEN_NAME[] = {
-    "ERR", "END", "NUM", "SYM", "OPR", "FNC", "BKT", "CMA", "UDF"
+    "TOKEN_ERR", "TOKEN_END", "TOKEN_NUM", "TOKEN_SYM", "TOKEN_OPR", "TOKEN_FNC", "TOKEN_BKT", "TOKEN_CMA", "TOKEN_UDF"
 };
 
 const struct {
@@ -227,7 +230,7 @@ typedef vlist_t vqueue_t;
 #define vq_empty(q) ((q)->size <= 0)
 #define vq_destory(q) vl_destory(q)
 
-token_t* get_token(analyzer_t *_self) {
+token_t* next_token(analyzer_t *_self) {
     char first_char;
     char buffer[100];
     char *pbuffer = buffer;
@@ -244,22 +247,22 @@ token_t* get_token(analyzer_t *_self) {
         buffer[0] = first_char;
         buffer[1] = '\0';
         _self->eptr++;
-        return set_token(&_self->token, OPR, buffer);
+        return set_token(&_self->token, TOKEN_OPR, buffer);
     case '(':   case ')':
         buffer[0] = first_char;
         buffer[1] = '\0';
         _self->eptr++;
-        return set_token(&_self->token, BKT, buffer);
+        return set_token(&_self->token, TOKEN_BKT, buffer);
     case ',':
         buffer[0] = first_char;
         buffer[1] = '\0';
         _self->eptr++;
-        return set_token(&_self->token, CMA, buffer);
+        return set_token(&_self->token, TOKEN_CMA, buffer);
     }
 
     // expr end here 
     if (first_char == '\0') {
-        return set_token(&_self->token, END, "");
+        return set_token(&_self->token, TOKEN_END, "");
     }
     // numberic
     else if (is_digit(first_char)) {
@@ -268,13 +271,13 @@ token_t* get_token(analyzer_t *_self) {
         }
         if (*_self->eptr != '.') {
             *pbuffer = '\0';
-            return set_token(&_self->token, NUM, buffer);
+            return set_token(&_self->token, TOKEN_NUM, buffer);
         }
         while (is_digit(*_self->eptr)) {
             *pbuffer++ = *_self->eptr++;
         }
         *pbuffer = '\0';
-        return set_token(&_self->token, NUM, buffer);
+        return set_token(&_self->token, TOKEN_NUM, buffer);
     }
     // symbol
     else if (is_alpha(first_char)) {
@@ -291,10 +294,10 @@ token_t* get_token(analyzer_t *_self) {
         *pbuffer = '\0';
 
         if (is_func) {
-            return set_token(&_self->token, FNC, buffer);
+            return set_token(&_self->token, TOKEN_FNC, buffer);
         }
         else {
-            return set_token(&_self->token, SYM, buffer);
+            return set_token(&_self->token, TOKEN_SYM, buffer);
         }
     }
     // undefined
@@ -302,7 +305,7 @@ token_t* get_token(analyzer_t *_self) {
         _self->eptr++;
         buffer[0] = first_char;
         buffer[1] = '\0';
-        return set_token(&_self->token, UDF, buffer);
+        return set_token(&_self->token, TOKEN_UDF, buffer);
     }
     return NULL;
 }
@@ -318,8 +321,8 @@ void reset_token(analyzer_t *_self) {
 int match_expr(analyzer_t *_self);
 
 int match_try_next(analyzer_t *_self) {
-    token_t *next = get_token(_self);
-    if (next->type == OPR) {
+    token_t *next = next_token(_self);
+    if (next->type == TOKEN_OPR) {
         return match_expr(_self);
     }
     else {
@@ -329,37 +332,37 @@ int match_try_next(analyzer_t *_self) {
 }
 
 int match_expr(analyzer_t *_self) {
-    token_t *token = get_token(_self);
+    token_t *token = next_token(_self);
     // printf("[%s] %s\n", DBG_TOKEN_NAME[token->type], token->content);
-    if (token->type == SYM || token->type == NUM) {
+    if (token->type == TOKEN_SYM || token->type == TOKEN_NUM) {
         return match_try_next(_self);
     }
-    else if (token->type == OPR && STR_EQUAL(token->content, "-")) {
+    else if (token->type == TOKEN_OPR && STR_EQUAL(token->content, "-")) {
         return match_expr(_self) && match_try_next(_self);
     }
-    else if (token->type == FNC) {
+    else if (token->type == TOKEN_FNC) {
         while (1) {
             int result = match_expr(_self);
             if (!result)
                 return 0;
-            token = get_token(_self);
-            if (token->type == CMA)
+            token = next_token(_self);
+            if (token->type == TOKEN_CMA)
                 continue;
-            else if (token->type == BKT && *token->content == ')')
+            else if (token->type == TOKEN_BKT && *token->content == ')')
                 break;
             else
                 return 0;
         }
         return match_try_next(_self);
     }
-    else if (token->type == BKT && STR_EQUAL(token->content, "(")) {
+    else if (token->type == TOKEN_BKT && STR_EQUAL(token->content, "(")) {
         int success = match_expr(_self);
         if (!success) return 0;
-        token = get_token(_self);
+        token = next_token(_self);
         // printf("A[%s] %s\n", DBG_TOKEN_NAME[token->type], token->content);
-        if (token->type == BKT && STR_EQUAL(token->content, ")")) {
-            token_t *next = get_token(_self);
-            if (next->type == OPR) {
+        if (token->type == TOKEN_BKT && STR_EQUAL(token->content, ")")) {
+            token_t *next = next_token(_self);
+            if (next->type == TOKEN_OPR) {
                 return match_expr(_self);
             }
             else {
@@ -393,8 +396,8 @@ int check_expr(analyzer_t *_self) {
     }
     else {
         // checkout not end
-        token_t *token = get_token(_self);
-        if (token->type != END) {
+        token_t *token = next_token(_self);
+        if (token->type != TOKEN_END) {
             display_syntax_error(_self);
             return 0;
         }
@@ -441,9 +444,9 @@ void en_destory(expr_node_t *node) {
 expr_node_t* build_expr_tree(analyzer_t *_self);
 
 expr_node_t* build_try_next(analyzer_t *_self, expr_node_t *left_node) {
-    token_t *token = get_token(_self);
+    token_t *token = next_token(_self);
 
-    if (token->type == OPR) {
+    if (token->type == TOKEN_OPR) {
         expr_node_t *opr_node = en_create_by_token(token, 2);
         expr_node_t *right_node = build_expr_tree(_self);
 
@@ -463,19 +466,19 @@ expr_node_t* build_try_next(analyzer_t *_self, expr_node_t *left_node) {
 expr_node_t* build_expr_tree(analyzer_t *_self) {
     token_t *token;
 
-    token = get_token(_self);
+    token = next_token(_self);
     // printf("token = %s,%s\n", DBG_TOKEN_NAME[token->type], token->content);
 
-    if (token->type == SYM || token->type == NUM) {
+    if (token->type == TOKEN_SYM || token->type == TOKEN_NUM) {
         expr_node_t *left_node = en_create_by_token(token, 0);
         return build_try_next(_self, left_node);
     }
-    else if (token->type == OPR) { // '-'
+    else if (token->type == TOKEN_OPR) { // '-'
         expr_node_t* opr_node = en_create_by_token(token, 1);
         EN_LCHILD(opr_node) = build_expr_tree(_self);
         return build_try_next(_self, opr_node);
     }
-    else if (token->type == FNC) {
+    else if (token->type == TOKEN_FNC) {
         char *func_name = STR_DUMP(token->content);
         expr_node_t *func_node = NULL;
         expr_node_t *child_buf[100];
@@ -486,16 +489,16 @@ expr_node_t* build_expr_tree(analyzer_t *_self) {
 
             child_buf[child_num++] = child;
 
-            token = get_token(_self);
-            if (token->type == CMA) {
+            token = next_token(_self);
+            if (token->type == TOKEN_CMA) {
                 continue;
             }
-            else if (token->type == BKT && *token->content == ')') {
+            else if (token->type == TOKEN_BKT && *token->content == ')') {
                 break;
             }
         }
 
-        func_node = en_new(FNC, func_name, child_num);
+        func_node = en_new(TOKEN_FNC, func_name, child_num);
         for (i = 0; i < child_num; ++i) {
             func_node->children[i] = child_buf[i];
         }
@@ -503,10 +506,10 @@ expr_node_t* build_expr_tree(analyzer_t *_self) {
 
         return build_try_next(_self, func_node);
     }
-    else if (token->type == BKT && *token->content == '(') {
-        expr_node_t *bkt_node = en_new(BKT, "()", 1);
+    else if (token->type == TOKEN_BKT && *token->content == '(') {
+        expr_node_t *bkt_node = en_new(TOKEN_BKT, "()", 1);
         bkt_node->children[0] = build_expr_tree(_self);
-        get_token(_self); // ignore ')'
+        next_token(_self); // ignore ')'
 
         return build_try_next(_self, bkt_node);
     }
@@ -517,7 +520,7 @@ expr_node_t* build_expr_tree(analyzer_t *_self) {
 expr_node_t* reduce_bkt(expr_node_t * en) {
     expr_node_t* content;
 
-    if (en == NULL || en->type != BKT) return en;
+    if (en == NULL || en->type != TOKEN_BKT) return en;
 
     content = en->children[0];
     en->children[0] = NULL;
@@ -528,15 +531,46 @@ expr_node_t* reduce_bkt(expr_node_t * en) {
 }
 
 void reduce_all_bkt(expr_node_t * en) {
-    if (en == NULL || en->type == SYM || en->type == NUM) {
+    int i;
+    if (en == NULL || en->type == TOKEN_SYM || en->type == TOKEN_NUM) {
         return;
     }
     if (STR_EQUAL("/", en->content)) {
         EN_LCHILD(en) = reduce_bkt(EN_LCHILD(en));
         EN_RCHILD(en) = reduce_bkt(EN_RCHILD(en));
     }
-    reduce_all_bkt(EN_LCHILD(en));
-    reduce_all_bkt(EN_RCHILD(en));
+    else if (STR_EQUAL("^", en->content)) {
+        EN_RCHILD(en) = reduce_bkt(EN_RCHILD(en));
+    }
+    for (i = 0; i < en->child_num; ++i) {
+        reduce_all_bkt(en->children[i]);
+    }
+}
+
+void reduce_sqrt(expr_node_t * en) {
+    int i;
+    if (en == NULL || en->type == TOKEN_SYM || en->type == TOKEN_NUM) {
+        return;
+    }
+    for (i = 0; i < en->child_num; ++i) {
+        reduce_sqrt(en->children[i]);
+    }
+    if (STR_EQUAL("^", en->content)) {
+        expr_node_t * power = EN_RCHILD(en);
+        if (power->type == TOKEN_OPR && STR_EQUAL("/", power->content)) {
+            if (EN_LCHILD(power)->type == TOKEN_NUM && STR_EQUAL("1", EN_LCHILD(power)->content)
+             && EN_RCHILD(power)->type == TOKEN_NUM && STR_EQUAL("2", EN_RCHILD(power)->content)) {
+                expr_node_t *base = EN_LCHILD(en);
+                en_destory(power);
+                free(en->children);
+                en->child_num = 1;
+                en->children = (expr_node_t **)malloc(1 * sizeof(expr_node_t *));
+                en->children[0] = base;
+                en->type = TOKEN_FNC;
+                STR_COPY(en->content, TOKEN_LENGTH_MAX, "sqrt");
+            }
+        }
+    }
 }
 
 int opr_priority(const expr_node_t *node) {
@@ -553,14 +587,14 @@ expr_node_t* sort_expr_tree(expr_node_t *en, int *ptr_change_flag) {
     if (en == NULL) {
         return NULL;
     }
-    else if (en->type == FNC || en->type == BKT) {
+    else if (en->type == TOKEN_FNC || en->type == TOKEN_BKT) {
         int i;
         for (i = 0; i < en->child_num; ++i) {
             en->children[i] = sort_expr_tree(en->children[i], ptr_change_flag);
         }
         return en;
     }
-    else if (en->type == OPR) {
+    else if (en->type == TOKEN_OPR) {
         expr_node_t *enr, *a, *b;
         /*
         上一步中 1/2+3 会被解析成如下的表达式树
@@ -586,7 +620,7 @@ expr_node_t* sort_expr_tree(expr_node_t *en, int *ptr_change_flag) {
         EN_RCHILD(en) = sort_expr_tree(EN_RCHILD(en), ptr_change_flag);
         enr = EN_RCHILD(en);
 
-        if (enr->type == OPR && opr_priority(en) >= opr_priority(enr)) {
+        if (enr->type == TOKEN_OPR && opr_priority(en) >= opr_priority(enr)) {
             *ptr_change_flag = 1;
             
             a = EN_LCHILD(enr);
@@ -642,10 +676,10 @@ void rn_destory(renderer_node_t *_self) {
 }
 
 void build_renderer(expr_node_t *en, renderer_node_t *renderer) {
-    if (en->type == SYM || en->type == NUM) {
+    if (en->type == TOKEN_SYM || en->type == TOKEN_NUM) {
         vl_push_back(renderer->children, rn_new(RNTYP_TEXT, en->content));
     }
-    else if (en->type == OPR) {
+    else if (en->type == TOKEN_OPR) {
         if (STR_EQUAL(en->content, "/") || STR_EQUAL(en->content, "^")) {
             renderer_node_t *l = rn_new(RNTYP_NODE, "up");
             renderer_node_t *r = rn_new(RNTYP_NODE, "down");
@@ -664,7 +698,7 @@ void build_renderer(expr_node_t *en, renderer_node_t *renderer) {
             build_renderer(EN_RCHILD(en), renderer);
         }
     }
-    else if (en->type == BKT) {
+    else if (en->type == TOKEN_BKT) {
         renderer_node_t *bkt = rn_new(RNTYP_NODE, "(bkt)");
         renderer_node_t *inner = rn_new(RNTYP_NODE, "inner");
         int i;
@@ -674,7 +708,7 @@ void build_renderer(expr_node_t *en, renderer_node_t *renderer) {
         vl_push_back(bkt->children, inner);
         vl_push_back(renderer->children, bkt);
     }
-    else if (en->type == FNC) {
+    else if (en->type == TOKEN_FNC) {
         renderer_node_t *func = rn_new(RNTYP_FUNC, en->content);
         renderer_node_t *inner = rn_new(RNTYP_NODE, "inner");
         int i;
@@ -731,7 +765,7 @@ void test_size(renderer_node_t * rn) {
         rn->height = FONT_HEIGHT_PX;
     }
     else if (rn->type == RNTYP_FUNC) {
-        if (STR_EQUAL("SQRT", rn->content)) {
+        if (STR_EQUAL("sqrt", rn->content)) {
             renderer_node_t *content = (renderer_node_t *)rn->children->head->data;
 
             test_size(content);
@@ -816,7 +850,7 @@ void test_size(renderer_node_t * rn) {
                     }
                 }
                 else if (child->type == RNTYP_FUNC) {
-                    if (STR_EQUAL("SQRT", child->content)) {
+                    if (STR_EQUAL("sqrt", child->content)) {
                         int test_top = FONT_HEIGHT_PX / 2 - child->height / 2;
                         int test_bottom = FONT_HEIGHT_PX / 2 + child->height / 2;
                         if (test_top < top) top = test_top;
@@ -849,7 +883,7 @@ void render(int *x, int *y, renderer_node_t *rn) {
     else if (rn->type == RNTYP_FUNC) {
         int ox = *x;
         int oy = *y;
-        if (STR_EQUAL("SQRT", rn->content)) {
+        if (STR_EQUAL("sqrt", rn->content)) {
             int fy;
             renderer_node_t *one = (renderer_node_t *)rn->children->head->data;
 
@@ -973,7 +1007,7 @@ void render(int *x, int *y, renderer_node_t *rn) {
                     }
                 }
                 else if (child->type == RNTYP_FUNC) {
-                    if (STR_EQUAL("SQRT", child->content)) {
+                    if (STR_EQUAL("sqrt", child->content)) {
                         int test_top = FONT_HEIGHT_PX / 2 - child->height / 2;
 
                         if (test_top < top) top = test_top;
@@ -1005,7 +1039,7 @@ char key2char(int key) {
         return '0' + (key - KEY_CHAR_0);
     }
     if (key >= KEY_CHAR_A && key <= KEY_CHAR_Z) {
-        return 'A' + (key - KEY_CHAR_A);
+        return 'a' + (key - KEY_CHAR_A);
     }
     switch (key) {
         case KEY_CHAR_PLUS:     return '+';
@@ -1017,6 +1051,7 @@ char key2char(int key) {
         case KEY_CHAR_COMMA:    return ',';
         case KEY_CHAR_DP:       return '.';
         case KEY_CHAR_POW:      return '^';
+        case KEY_CHAR_EQUAL:    return '=';
     }
     return 0;
 }
@@ -1071,66 +1106,93 @@ void get_string(const int x, const int y, const int char_width, char *buffer, co
     }
 }
 
+void draw_expr(int x, int y, int *p_width, int *p_height, const char *str_expr) {
+    analyzer_t analyzer;
+    expr_node_t *expr_root;
+    renderer_node_t *renderer_root = rn_new(RNTYP_NODE, "root");
+    renderer_node_t *rn = renderer_root;
+
+    analyzer.expr = str_expr;
+    reset_token(&analyzer);
+
+    expr_root = build_expr_tree(&analyzer);
+    travel_expr(expr_root, 0);
+    sort_expr(&expr_root);
+    reduce_all_bkt(expr_root);
+    reduce_sqrt(expr_root);
+    travel_expr(expr_root, 0);
+    build_renderer(expr_root, renderer_root);
+    travel_renderer(renderer_root, 0);
+    test_size(renderer_root);
+    printf("size=%d,%d\n", renderer_root->width, renderer_root->height);
+
+    disp_set_color(RGB_24_TO_565(55, 55, 200));
+    disp_line(x - 1, y - 1, x + rn->width + 1, y - 1);
+    disp_line(x - 1, y + 1 + rn->height, x + rn->width + 1, y + 1 + rn->height);
+    disp_line(x - 1, y - 1, x - 1, y + 1 + rn->height);
+    disp_line(x + 1 + rn->width, y - 1, x + 1 + rn->width, y + 1 + rn->height);
+    disp_set_color(RGB_24_TO_565(0, 0, 0));
+
+    render(&x, &y, renderer_root);
+
+    put_disp();
+
+    if (p_width != NULL) *p_width = rn->width;
+    if (p_height != NULL) *p_height = rn->height;
+
+    rn_destory(renderer_root);
+    en_destory(expr_root);
+}
+
 #if defined(APP_MSVC)
 int app() {
 #else
 int main(int argc, char **argv) {
 #endif
     static const char title[] = "============== Formula-Z Renderer =============";
-    char buffer[200] = "A+B";
+    char buffer[200] = "expand((sqrt(a)+b)^2)";
 
     init_graph_app();
 
     all_clr();
 
     while (1) {
-        disp_string(0, 40, title);
-        get_string(0, 1 + 48, sizeof(title) - 1, buffer, sizeof(buffer));
+        int left = 0;
+        int top = 30;
+
+        disp_string(left, top, title);
+        disp_string(left, top + 8, "> ");
+        get_string(left + 6 * 3, top + 8, sizeof(title) - 1, buffer, sizeof(buffer));
         
         all_clr();
-
-        analyzer_t analyzer;
-        expr_node_t *expr_root;
-        renderer_node_t *renderer_root = rn_new(RNTYP_NODE, "root");
-
-        analyzer.expr = buffer;
-        reset_token(&analyzer);
-
-        if (!check_expr(&analyzer)) {
+        /*
+        while (1) {
+            int key = wait_key();
+            printf("%c = %d\n", key, key);
+            if (key == 0)
+                break;
+        }
+        */
+        run(buffer);
+        // if (!check_expr(&analyzer)) {
+        if (*result_buffer == '\n') {
             disp_set_color(RGB_24_TO_565(255,0 ,0));
-            disp_string(0, 48 + 12, "Syntax Error!");
+            disp_string(left, top + 8 + 8, "Syntax Error!");
             disp_set_color(RGB_24_TO_565(0, 0, 0));
         }
         else {
-            expr_root = build_expr_tree(&analyzer);
-            travel_expr(expr_root, 0);
-            sort_expr(&expr_root);
-            // reduce_all_bkt(expr_root);
-            travel_expr(expr_root, 0);
-            build_renderer(expr_root, renderer_root);
-            travel_renderer(renderer_root, 0);
-            test_size(renderer_root);
-            printf("size=%d,%d\n", renderer_root->width, renderer_root->height);
+            int width, height;
+            int top2 = top + 8 + 8 + 1;
 
-            {
-                int x = 2;
-                int y = 12 + 48;
-                renderer_node_t *rn = renderer_root;
+            draw_expr(left + 5 * 6, top2, &width, &height, buffer);
 
-                disp_set_color(RGB_24_TO_565(55, 155, 55));
-                disp_line(x - 1, y - 1, x + rn->width + 1, y - 1);
-                disp_line(x - 1, y + 1 + rn->height, x + rn->width + 1, y + 1 + rn->height);
-                disp_line(x - 1, y - 1, x - 1, y + 1 + rn->height);
-                disp_line(x + 1 + rn->width, y - 1, x + 1 + rn->width, y + 1 + rn->height);
-                disp_set_color(RGB_24_TO_565(0, 0, 0));
+            disp_string(left, top2 + (height - 8) / 2, "In = ");
 
-                render(&x, &y, renderer_root);
-            }
+            top2 += height + 4;
 
-            put_disp();
+            draw_expr(left + 6 * 6, top2, &width, &height, result_buffer);
 
-            rn_destory(renderer_root);
-            en_destory(expr_root);
+            disp_string(left, top2 + (height - 8) / 2, "Out = ");
         }
     }
 
