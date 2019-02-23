@@ -56,7 +56,8 @@
 #       define KEY_CHAR_DP          '.'
 #       define KEY_CTRL_EXE         0xd
 #       define KEY_CTRL_DEL         127
-#       define KEY_CHAR_POW         292 /* F11 */         
+#       define KEY_CHAR_POW         292 /* F11 */ 
+#       define KEY_CHAR_EQUAL       '='
 #   elif defined(APP_FXCG)
 #       include <keyboard_syscalls.h>
 #       include <keyboard.hpp>
