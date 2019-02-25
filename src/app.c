@@ -2,7 +2,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
-#include "eigenmath/defs.h"
+// #include "eigenmath/defs.h"
 
 // #define CONSOLE_ONLY
 
@@ -888,7 +888,7 @@ void render(int *x, int *y, renderer_node_t *rn) {
             renderer_node_t *one = (renderer_node_t *)rn->children->head->data;
 
             *x += 5;
-            *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2 + 2;
+            *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2 + 1;
             fy = *y - 2;
             render(x, y, one);
 
@@ -1149,16 +1149,16 @@ int app() {
 #else
 int main(int argc, char **argv) {
 #endif
-    static const char title[] = "============== Formula-Z Renderer =============";
-    char buffer[200] = "expand((sqrt(a)+b)^2)";
-
+    static const char title[] = "=== Formula-Z Renderer ===";
+    char buffer[200] = "expand((sqrt(a)+b)^2)+sqrt(x)/sqrt(y^5+1)/x+1";
+    char result_buffer[] = "1 + a + b^2 + 2*a^(1/2)*b + 1 / (x^(1/2)*(y^5 + 1)^(1/2))";
     init_graph_app();
 
     all_clr();
 
     while (1) {
         int left = 0;
-        int top = 30;
+        int top = 14;
 
         disp_string(left, top, title);
         disp_string(left, top + 8, "> ");
@@ -1173,7 +1173,8 @@ int main(int argc, char **argv) {
                 break;
         }
         */
-        run(buffer);
+        //run(buffer);
+        //puts(result_buffer);
         // if (!check_expr(&analyzer)) {
         if (*result_buffer == '\n') {
             disp_set_color(RGB_24_TO_565(255,0 ,0));
@@ -1182,13 +1183,13 @@ int main(int argc, char **argv) {
         }
         else {
             int width, height;
-            int top2 = top + 8 + 8 + 1;
+            int top2 = top + 8 + 8 + 4;
 
-            draw_expr(left + 5 * 6, top2, &width, &height, buffer);
+            draw_expr(left + 6 * 6, top2, &width, &height, buffer);
 
-            disp_string(left, top2 + (height - 8) / 2, "In = ");
+            disp_string(left, top2 + (height - 8) / 2, "In  = ");
 
-            top2 += height + 4;
+            top2 += height + 8;
 
             draw_expr(left + 6 * 6, top2, &width, &height, result_buffer);
 

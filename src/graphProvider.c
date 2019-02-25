@@ -62,8 +62,13 @@ void put_disp() {
     SDL_UpdateRect(screen, 0, 0, LCD_WIDTH_PX, LCD_HEIGHT_PX);
 }
 
-void set_pixel(int x, int y, color_t color) {
+void set_pixel(int _x, int _y, color_t color) {
+    int x = 2 * _x;
+    int y = 2 * _y;
     SDL_PutPixel(screen, x, y, color);
+    SDL_PutPixel(screen, x + 1, y, color);
+    SDL_PutPixel(screen, x, y + 1, color);
+    SDL_PutPixel(screen, x + 1, y + 1, color);
 }
 
 void all_clr() {
@@ -87,8 +92,13 @@ void put_disp() {
     Bdisp_PutDisp_DD();
 }
 
-void set_pixel(int x, int y, color_t color) {
+void set_pixel(int _x, int _y, color_t color) {
+    int x = 2 * _x;
+    int y = 2 * _y;
     _set_pixel(x, y, color);
+    _set_pixel(x + 1, y, color);
+    _set_pixel(x, y + 1, color);
+    _set_pixel(x + 1, y + 1, color);
 }
 
 #endif

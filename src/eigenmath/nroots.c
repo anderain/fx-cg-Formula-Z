@@ -3,6 +3,10 @@
 #include "stdafx.h"
 #include "defs.h"
 
+#ifndef RAND_MAX
+#define RAND_MAX __RAND_MAX
+#endif
+
 #define YMAX 101
 #define DELTA 1.0e-6
 #define EPSILON 1.0e-9

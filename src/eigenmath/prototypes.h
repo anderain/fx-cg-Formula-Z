@@ -599,7 +599,7 @@ void test_mag(void);
 // io.c
 // void clear_term();
 // void eval_display(void);
-void printstr(char *s);
+void printstr(const char *s);
 void printchar(int c);
 extern char result_buffer[];
 // void printchar_nowrap(int c);
@@ -981,14 +981,15 @@ void variables(void);
 void vectorize(int n);
 
 // window.cpp
+/*
 void printchar_nowrap(int c);
 void printchar(int c);
-void printstr(char *s);
+void printstr(const char *s);
 void clear_term(void);
 void shipout(unsigned char *d, int w, int h);
 void draw_display(void);
 char * get_tty_buf(void);
-
+*/
 // zero.cpp
 void eval_zero(void);
 void test_zero(void);

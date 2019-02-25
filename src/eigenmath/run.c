@@ -1,20 +1,17 @@
 #include "stdafx.h"
 #include "defs.h"
 
-jmp_buf stop_return, draw_stop_return;
+int FLAG_STOP = 0;
 
 void
 stop(char *s)
 {
-    puts(".");
-	if (draw_flag == 2)
-		longjmp(draw_stop_return, 1);
-	else {
-		printstr("Stop: ");
-		printstr(s);
-		printstr("\n");
-		longjmp(stop_return, 1);
-	}
+    puts("STOP!");
+	printstr("\\ERROR\\");
+	//printstr(s);
+	//printstr("\n");
+	//longjmp(stop_return, 1);
+    FLAG_STOP = 1;
 }
 
 void
@@ -22,14 +19,15 @@ run(char *s)
 {
 	int i, n;
 
-	if (setjmp(stop_return))
-		return;
+	//if (setjmp(stop_return))
+	//	return;
+    FLAG_STOP = 0;
 
     lineclear();
 
 	init();
 
-	while (1) {
+	while (!FLAG_STOP) {
 
 		n = scan(s);
 

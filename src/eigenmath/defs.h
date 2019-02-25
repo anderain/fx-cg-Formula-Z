@@ -1,7 +1,4 @@
 
-#define LONGLONG        __int64
-#define ULONGLONG       unsigned __int64
-
 // size of the symbol table
 
 #define NSYM 1000
@@ -255,12 +252,23 @@ enum {
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
-#include <fcntl.h>
 #include <string.h>
-#include <setjmp.h>
+#include "../platform.h"
+#ifdef APP_FXCG
+#include <machine/fastmath.h>
+#include <sys/errno.h>
+#else
 #include <math.h>
 #include <errno.h>
+#endif
+
+#ifdef APP_FXCG
+#define LONGLONG        long long
+#define ULONGLONG       unsigned long long
+#else
+#define LONGLONG        __int64
+#define ULONGLONG       unsigned __int64
+#endif
 
 #define MAXDIM 24
 
@@ -351,7 +359,6 @@ extern U symtab[];
 extern char out_buf[];
 extern int out_count;
 extern int test_flag;
-extern jmp_buf draw_stop_return;
 extern int endian;
 #define little_endian() (*((unsigned char *) &endian))
 

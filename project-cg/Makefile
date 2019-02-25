@@ -39,7 +39,7 @@ LDFLAGS	= $(MACHDEP) -T$(FXCGSDK)/common/prizm.ld -Wl,-static -Wl,-gc-sections
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:=	-lfxcg -lgcc
+LIBS	:=	-lfxcg -lgcc -lm -lc -lnosys
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -69,6 +69,12 @@ CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 sFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
+
+# EIGE_CFILES	:=	$(foreach dir,$(SOURCES)/eigenmath,$(notdir $(wildcard $(dir)/*.c)))
+# CFILES		:= $(CFILES) $(foreach c, $(EIGE_CFILES), eigenmath/$(c))
+
+# list *.c files
+# $(info $(CFILES))
 
 #---------------------------------------------------------------------------------
 # use CXX for linking C++ projects, CC for standard C
@@ -102,8 +108,8 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 #---------------------------------------------------------------------------------
 $(BUILD):
 	@[ -d $@ ] || mkdir $@
+	# @[ -d $@/eigenmath ] || mkdir $@/eigenmath
 	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
-	cp *.g3a I:/Vmshare/
 #---------------------------------------------------------------------------------
 export CYGWIN := nodosfilewarning
 clean:
