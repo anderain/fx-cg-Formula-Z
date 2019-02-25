@@ -20,7 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\app.c" />
-    <ClCompile Include="..\src\char6x8.c" />
     <ClCompile Include="..\src\fileProvider.c" />
     <ClCompile Include="..\src\fontProvider.c" />
     <ClCompile Include="..\src\graphProvider.c" />
@@ -30,6 +29,8 @@
   <ItemGroup>
     <ClInclude Include="..\src\fileProvider.h" />
     <ClInclude Include="..\src\fontProvider.h" />
+    <ClInclude Include="..\src\font\font_06x08_001.h" />
+    <ClInclude Include="..\src\font\font_08x16_001.h" />
     <ClInclude Include="..\src\graphProvider.h" />
     <ClInclude Include="..\src\inputProvider.h" />
     <ClInclude Include="..\src\platform.h" />

@@ -871,14 +871,40 @@ void test_size(renderer_node_t * rn) {
     }
 }
 
+int is_operator(int c) {
+    switch (c) {
+    case '+':
+    case '-':
+    case '*':
+    case '/':
+    case '(':
+    case ')':
+    case ',':
+    case '.':
+    case '^':
+    case '=': return 1;
+    }
+    return 0;
+}
+
 void render(int *x, int *y, renderer_node_t *rn) {
 
     if (rn->type == RNTYP_TEXT) {
         int i;
+
+        if (is_operator(*rn->content))
+            disp_set_color(RGB_24_TO_565(10, 10, 255));
+        else if (is_alpha(*rn->content))
+            disp_set_color(RGB_24_TO_565(255, 10, 10));
+        else if (is_digit(*rn->content))
+            disp_set_color(RGB_24_TO_565(10, 155, 100));
+
         for (i = 0; rn->content[i]; ++i) {
             disp_char(*x, *y, rn->content[i]);
             *x += FONT_WIDTH_PX;
         }
+
+        disp_set_color(0);
     }
     else if (rn->type == RNTYP_FUNC) {
         int ox = *x;
@@ -892,9 +918,9 @@ void render(int *x, int *y, renderer_node_t *rn) {
             fy = *y - 2;
             render(x, y, one);
 
-            disp_line(ox, fy + rn->height - 5, ox + 2, fy + rn->height - 3);
-            disp_line(ox + 2, fy + rn->height - 3, ox + 4, fy);
-            disp_line(ox + 4, fy, ox + rn->width, fy);
+            disp_aa_line(ox, fy + rn->height - 7, ox + 2, fy + rn->height - 3);
+            disp_aa_line(ox + 2, fy + rn->height - 3, ox + 4, fy);
+            disp_aa_line(ox + 4, fy, ox + rn->width, fy);
 
             *x = ox + rn->width;
             *y = oy;
@@ -904,10 +930,14 @@ void render(int *x, int *y, renderer_node_t *rn) {
 
             renderer_node_t *one = (renderer_node_t *)rn->children->head->data;
 
+            disp_set_color(RGB_24_TO_565(10, 10, 255));
+
             for (i = 0; rn->content[i]; ++i) {
                 disp_char(*x, *y, rn->content[i]);
                 *x += FONT_WIDTH_PX;
             }
+
+            disp_set_color(RGB_24_TO_565(10, 10, 255));
 
             *x += 1;
             *y = oy + FONT_HEIGHT_PX / 2 - one->height / 2;
@@ -937,7 +967,7 @@ void render(int *x, int *y, renderer_node_t *rn) {
             *y = oy - num->height + FONT_HEIGHT_PX / 2 - 1;
             render(x, y, num);
 
-            disp_line(ox + 1, oy + FONT_HEIGHT_PX / 2 - 1, ox + rn->width - 1, oy + FONT_HEIGHT_PX / 2 - 1);
+            disp_aa_line(ox + 1, oy + FONT_HEIGHT_PX / 2 - 1, ox + rn->width - 1, oy + FONT_HEIGHT_PX / 2 - 1);
 
             *x = ox + (rn->width - den->width) / 2;
             *y = oy + FONT_HEIGHT_PX / 2 + 1;
@@ -1031,6 +1061,7 @@ void render(int *x, int *y, renderer_node_t *rn) {
             *y = oy;
         }
     }
+
 }
 #endif
 
@@ -1126,7 +1157,7 @@ void draw_expr(int x, int y, int *p_width, int *p_height, const char *str_expr) 
     test_size(renderer_root);
     printf("size=%d,%d\n", renderer_root->width, renderer_root->height);
 
-    disp_set_color(RGB_24_TO_565(55, 55, 200));
+    disp_set_color(RGB_24_TO_565(160, 180, 255));
     disp_line(x - 1, y - 1, x + rn->width + 1, y - 1);
     disp_line(x - 1, y + 1 + rn->height, x + rn->width + 1, y + 1 + rn->height);
     disp_line(x - 1, y - 1, x - 1, y + 1 + rn->height);
@@ -1149,7 +1180,7 @@ int app() {
 #else
 int main(int argc, char **argv) {
 #endif
-    static const char title[] = "=== Formula-Z Renderer ===";
+    static const char title[] = "============ Formula-Z Renderer ============";
     char buffer[200] = "expand((sqrt(a)+b)^2)+sqrt(x)/sqrt(y^5+1)/x+1";
     char result_buffer[] = "1 + a + b^2 + 2*a^(1/2)*b + 1 / (x^(1/2)*(y^5 + 1)^(1/2))";
     init_graph_app();
@@ -1158,11 +1189,11 @@ int main(int argc, char **argv) {
 
     while (1) {
         int left = 0;
-        int top = 14;
+        int top = 28;
 
         disp_string(left, top, title);
-        disp_string(left, top + 8, "> ");
-        get_string(left + 6 * 3, top + 8, sizeof(title) - 1, buffer, sizeof(buffer));
+        disp_string(left, top + FONT_HEIGHT_PX, "> ");
+        get_string(left + FONT_WIDTH_PX * 3, top + FONT_HEIGHT_PX, sizeof(title) - 1, buffer, sizeof(buffer));
         
         all_clr();
         /*
@@ -1183,17 +1214,17 @@ int main(int argc, char **argv) {
         }
         else {
             int width, height;
-            int top2 = top + 8 + 8 + 4;
+            int top2 = top + FONT_HEIGHT_PX * 2 + FONT_HEIGHT_PX / 2;
 
-            draw_expr(left + 6 * 6, top2, &width, &height, buffer);
+            draw_expr(left + FONT_WIDTH_PX * 6, top2, &width, &height, buffer);
 
-            disp_string(left, top2 + (height - 8) / 2, "In  = ");
+            disp_string(left, top2 + (height - FONT_HEIGHT_PX) / 2, "In  = ");
 
             top2 += height + 8;
 
-            draw_expr(left + 6 * 6, top2, &width, &height, result_buffer);
+            draw_expr(left + FONT_WIDTH_PX * 6, top2, &width, &height, result_buffer);
 
-            disp_string(left, top2 + (height - 8) / 2, "Out = ");
+            disp_string(left, top2 + (height - FONT_HEIGHT_PX) / 2, "Out = ");
         }
     }
 

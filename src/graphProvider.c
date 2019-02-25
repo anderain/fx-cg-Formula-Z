@@ -15,7 +15,7 @@ void init_graph_app() {
     atexit(SDL_Quit);
 
     // screen = SDL_SetVideoMode(640, 480, 16, SDL_SWSURFACE);
-    screen = SDL_SetVideoMode(LCD_WIDTH_PX, LCD_HEIGHT_PX, 16, SDL_SWSURFACE);
+    screen = SDL_SetVideoMode(WIN_ZOOM * LCD_WIDTH_PX, WIN_ZOOM * LCD_HEIGHT_PX, 16, SDL_SWSURFACE);
     if (screen == NULL) {
         fprintf(stderr, "Couldn't set %dx%dx16 video mode: %s\n", LCD_WIDTH_PX, LCD_HEIGHT_PX, SDL_GetError());
         exit(1);
@@ -59,16 +59,16 @@ void SDL_PutPixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
 }
 
 void put_disp() {
-    SDL_UpdateRect(screen, 0, 0, LCD_WIDTH_PX, LCD_HEIGHT_PX);
+    SDL_UpdateRect(screen, 0, 0, LCD_WIDTH_PX * WIN_ZOOM, LCD_HEIGHT_PX * WIN_ZOOM);
 }
 
 void set_pixel(int _x, int _y, color_t color) {
-    int x = 2 * _x;
-    int y = 2 * _y;
-    SDL_PutPixel(screen, x, y, color);
-    SDL_PutPixel(screen, x + 1, y, color);
-    SDL_PutPixel(screen, x, y + 1, color);
-    SDL_PutPixel(screen, x + 1, y + 1, color);
+    int x = WIN_ZOOM * _x, ix;
+    int y = WIN_ZOOM * _y, iy;
+   
+    for (ix = 0; ix < WIN_ZOOM; ++ix)
+        for (iy = 0; iy < WIN_ZOOM; ++iy)
+            SDL_PutPixel(screen, x + ix, y + iy, color);
 }
 
 void all_clr() {
@@ -92,13 +92,8 @@ void put_disp() {
     Bdisp_PutDisp_DD();
 }
 
-void set_pixel(int _x, int _y, color_t color) {
-    int x = 2 * _x;
-    int y = 2 * _y;
+void set_pixel(int x, int y, color_t color) {
     _set_pixel(x, y, color);
-    _set_pixel(x + 1, y, color);
-    _set_pixel(x, y + 1, color);
-    _set_pixel(x + 1, y + 1, color);
 }
 
 #endif

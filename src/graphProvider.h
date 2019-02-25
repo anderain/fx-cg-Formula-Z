@@ -5,6 +5,7 @@
 #   include "platform.h"
 #   if defined(APP_MSVC)
 #       include "SDL.h"
+#       define WIN_ZOOM 2
 #   elif defined(APP_FXCG)
 #       include <display.h>
 #       include <display_syscalls.h>

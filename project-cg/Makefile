@@ -19,7 +19,7 @@ include $(FXCGSDK)/common/prizm_rules
 # SOURCES is a list of directories containing source code
 # INCLUDES is a list of directories containing extra header files
 #---------------------------------------------------------------------------------
-TARGET		:=	$(notdir $(CURDIR))
+TARGET		:=	fz
 BUILD		:=	build
 SOURCES		:=	../src
 DATA		:=	data  
@@ -108,7 +108,6 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 #---------------------------------------------------------------------------------
 $(BUILD):
 	@[ -d $@ ] || mkdir $@
-	# @[ -d $@/eigenmath ] || mkdir $@/eigenmath
 	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 #---------------------------------------------------------------------------------
 export CYGWIN := nodosfilewarning

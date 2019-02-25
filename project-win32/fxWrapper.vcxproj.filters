@@ -7,15 +7,15 @@
     <Filter Include="Platform">
       <UniqueIdentifier>{f3afdd20-4ac3-42d2-8bc9-57b5d211fc0f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\font">
+      <UniqueIdentifier>{f35168c6-c7eb-4154-a629-9d0b6af37a6d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="fxWrapper.c">
       <Filter>Platform</Filter>
     </ClCompile>
     <ClCompile Include="..\src\app.c">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\char6x8.c">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="..\src\fileProvider.c">
@@ -46,6 +46,12 @@
     </ClInclude>
     <ClInclude Include="..\src\fontProvider.h">
       <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\font\font_06x08_001.h">
+      <Filter>Source\font</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\font\font_08x16_001.h">
+      <Filter>Source\font</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
